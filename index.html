@@ -180,6 +180,65 @@
             color: var(--text);
         }
 
+        /* ── Filter Bar ── */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 18px;
+        }
+
+        .filter-pills {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .pill {
+            padding: 7px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .pill:hover { border-color: var(--gold); color: var(--text); }
+        .pill.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); }
+
+        .filter-month-wrap input[type="month"] {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 7px 12px;
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            transition: border-color 0.15s;
+        }
+
+        .filter-month-wrap input[type="month"]:focus,
+        .filter-month-wrap input[type="month"]:hover { border-color: var(--gold); }
+
+        .filter-label {
+            margin-left: auto;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
         /* ── Stats Grid ── */
         .stats-grid {
             display: grid;
@@ -568,6 +627,20 @@
 
 <!-- ═══════════════════ DASHBOARD ═══════════════════ -->
 <div class="section active container" id="section-dashboard">
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+        <div class="filter-pills">
+            <button class="pill active" data-filter="all"     onclick="setFilter('all')">All Time</button>
+            <button class="pill"        data-filter="7days"   onclick="setFilter('7days')">Last 7 Days</button>
+            <button class="pill"        data-filter="month"   onclick="setFilter('month')">This Month</button>
+        </div>
+        <div class="filter-month-wrap">
+            <input type="month" id="month-picker" onchange="setFilterMonth(this.value)" title="Pick a specific month">
+        </div>
+        <div class="filter-label" id="filter-label"></div>
+    </div>
+
     <div class="stats-grid" id="stats-grid"></div>
 
     <div class="card">
@@ -767,6 +840,8 @@
 let calls = JSON.parse(localStorage.getItem('sc_calls') || '[]');
 let tog = { showed: null, qualified: null, pitched: null, paid: null };
 let chartInstances = {};
+let activeFilter = 'all';   // 'all' | '7days' | 'month' | 'custom'
+let customMonth  = null;    // 'YYYY-MM' string when filter is 'custom'
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
@@ -944,18 +1019,83 @@ function clearAllCalls() {
     renderAll();
 }
 
+// ── Filter ────────────────────────────────────────────────────────────────────
+
+function getFilteredCalls() {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    if (activeFilter === '7days') {
+        const cutoff = new Date(today);
+        cutoff.setDate(cutoff.getDate() - 6);
+        cutoff.setHours(0, 0, 0, 0);
+        return calls.filter(c => new Date(c.date) >= cutoff);
+    }
+
+    if (activeFilter === 'month') {
+        const y = today.getFullYear(), m = today.getMonth();
+        return calls.filter(c => {
+            const d = new Date(c.date);
+            return d.getFullYear() === y && d.getMonth() === m;
+        });
+    }
+
+    if (activeFilter === 'custom' && customMonth) {
+        const [y, m] = customMonth.split('-').map(Number);
+        return calls.filter(c => {
+            const d = new Date(c.date);
+            return d.getFullYear() === y && d.getMonth() === m - 1;
+        });
+    }
+
+    return calls; // 'all'
+}
+
+function setFilter(f) {
+    activeFilter = f;
+    customMonth  = null;
+    document.getElementById('month-picker').value = '';
+    document.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p.dataset.filter === f));
+    renderDashboard();
+}
+
+function setFilterMonth(val) {
+    if (!val) return;
+    activeFilter = 'custom';
+    customMonth  = val;
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    renderDashboard();
+}
+
+function filterLabel(filtered) {
+    const n = filtered.length;
+    if (activeFilter === 'all')    return `All time &mdash; ${n} call${n !== 1 ? 's' : ''}`;
+    if (activeFilter === '7days')  return `Last 7 days &mdash; ${n} call${n !== 1 ? 's' : ''}`;
+    if (activeFilter === 'month') {
+        const now = new Date();
+        return `${now.toLocaleString('default',{month:'long'})} ${now.getFullYear()} &mdash; ${n} call${n !== 1 ? 's' : ''}`;
+    }
+    if (activeFilter === 'custom' && customMonth) {
+        const [y, m] = customMonth.split('-').map(Number);
+        const label = new Date(y, m - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+        return `${label} &mdash; ${n} call${n !== 1 ? 's' : ''}`;
+    }
+    return '';
+}
+
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
-function stats() {
-    const n       = calls.length;
-    const showed  = calls.filter(c => c.showed).length;
-    const qual    = calls.filter(c => c.qualified).length;
-    const pitched = calls.filter(c => c.pitched).length;
-    const closed  = calls.filter(c => c.paid).length;
+function stats(src) {
+    const c       = src || getFilteredCalls();
+    const n       = c.length;
+    const showed  = c.filter(x => x.showed).length;
+    const qual    = c.filter(x => x.qualified).length;
+    const pitched = c.filter(x => x.pitched).length;
+    const closed  = c.filter(x => x.paid).length;
 
-    const totalDeal = calls.reduce((s, c) => s + c.deal, 0);
-    const collected = calls.reduce((s, c) => s + c.upfront, 0);
-    const owed      = calls.reduce((s, c) => s + c.owed, 0);
+    const totalDeal = c.reduce((s, x) => s + x.deal, 0);
+    const collected = c.reduce((s, x) => s + x.upfront, 0);
+    const owed      = c.reduce((s, x) => s + x.owed, 0);
 
     const pct = (a, b) => b === 0 ? 0 : Math.round(a / b * 100);
 
@@ -982,7 +1122,9 @@ function renderAll() {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 function renderDashboard() {
-    const s = stats();
+    const filtered = getFilteredCalls();
+    const s = stats(filtered);
+    document.getElementById('filter-label').innerHTML = filterLabel(filtered);
 
     document.getElementById('stats-grid').innerHTML = [
         { val: s.n,                    label: 'Calls Booked',   cls: '' },
@@ -1019,7 +1161,7 @@ function renderDashboard() {
         </div>
     `).join('');
 
-    renderCharts();
+    renderCharts(filtered);
 }
 
 // ── Charts ────────────────────────────────────────────────────────────────────
@@ -1038,10 +1180,11 @@ function groupBy(arr, key) {
     }, {});
 }
 
-function renderCharts() {
+function renderCharts(filtered) {
+    const fc = filtered || getFilteredCalls();
     // Source donut
     killChart('source');
-    const srcCounts = groupBy(calls, 'source');
+    const srcCounts = groupBy(fc, 'source');
     if (Object.keys(srcCounts).length) {
         chartInstances.source = new Chart(document.getElementById('chart-source'), {
             type: 'doughnut',
@@ -1052,7 +1195,7 @@ function renderCharts() {
 
     // Objections bar
     killChart('objections');
-    const objCounts = groupBy(calls.filter(c => c.objection && c.objection !== 'None' && c.objection !== 'N/A (No Show)'), 'objection');
+    const objCounts = groupBy(fc.filter(c => c.objection && c.objection !== 'None' && c.objection !== 'N/A (No Show)'), 'objection');
     if (Object.keys(objCounts).length) {
         const sorted = Object.entries(objCounts).sort((a,b) => b[1]-a[1]);
         chartInstances.objections = new Chart(document.getElementById('chart-objections'), {
@@ -1064,7 +1207,7 @@ function renderCharts() {
 
     // Personality donut
     killChart('personality');
-    const persCounts = groupBy(calls.filter(c => c.personality !== 'Unknown' && c.showed), 'personality');
+    const persCounts = groupBy(fc.filter(c => c.personality !== 'Unknown' && c.showed), 'personality');
     if (Object.keys(persCounts).length) {
         chartInstances.personality = new Chart(document.getElementById('chart-personality'), {
             type: 'doughnut',
@@ -1076,7 +1219,7 @@ function renderCharts() {
     // Revenue by source
     killChart('revenue');
     const revBySrc = {};
-    calls.filter(c => c.paid).forEach(c => { revBySrc[c.source] = (revBySrc[c.source] || 0) + c.upfront; });
+    fc.filter(c => c.paid).forEach(c => { revBySrc[c.source] = (revBySrc[c.source] || 0) + c.upfront; });
     if (Object.keys(revBySrc).length) {
         chartInstances.revenue = new Chart(document.getElementById('chart-revenue'), {
             type: 'bar',
