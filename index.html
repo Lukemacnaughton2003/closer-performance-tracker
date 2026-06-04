@@ -596,6 +596,76 @@
             .form-grid  { grid-template-columns: 1fr; }
         }
     </style>
+
+    <style>
+        /* ── Mode Bar ── */
+        .mode-bar {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: center;
+            padding: 12px 20px;
+        }
+        .mode-toggle {
+            display: flex;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 3px;
+            gap: 3px;
+        }
+        .mode-btn {
+            padding: 7px 32px;
+            border: none;
+            background: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s;
+            letter-spacing: 0.2px;
+        }
+        .mode-btn.active { background: var(--gold); color: #060d1c; }
+        .mode-btn:hover:not(.active) { color: var(--text); }
+
+        /* ── Mode Visibility ── */
+        body[data-mode="setter"] #tabs,
+        body[data-mode="setter"] .section { display: none !important; }
+        body[data-mode="closer"] #setter-tabs,
+        body[data-mode="closer"] .setter-section { display: none !important; }
+
+        /* ── Setter Sections ── */
+        .setter-section { display: none; }
+        .setter-section.active { display: block; }
+
+        /* ── Objection Chips ── */
+        .obj-input-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+        .obj-input-row select { flex: 1; }
+        .obj-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 28px; }
+        .obj-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--gold-dim);
+            border: 1px solid rgba(201,168,76,0.3);
+            border-radius: 20px;
+            padding: 4px 10px 4px 12px;
+            font-size: 12px;
+            color: var(--gold-bright);
+        }
+        .obj-chip button {
+            background: none;
+            border: none;
+            color: var(--gold-bright);
+            cursor: pointer;
+            font-size: 15px;
+            line-height: 1;
+            padding: 0;
+            opacity: 0.7;
+        }
+        .obj-chip button:hover { opacity: 1; }
+    </style>
 </head>
 <body>
 
@@ -615,6 +685,14 @@
     </div>
 
     <div class="header-spacer"></div>
+</div>
+
+<!-- ═══════════════════ MODE TOGGLE ═══════════════════ -->
+<div class="mode-bar">
+    <div class="mode-toggle">
+        <button class="mode-btn" id="mode-btn-closer" onclick="setMode('closer')">Closer</button>
+        <button class="mode-btn" id="mode-btn-setter" onclick="setMode('setter')">Setter</button>
+    </div>
 </div>
 
 <!-- ═══════════════════ TABS ═══════════════════ -->
@@ -834,6 +912,138 @@
     <div id="insights-wrap"></div>
 </div>
 
+<!-- ═══════════════════ SETTER TABS ═══════════════════ -->
+<div class="tabs" id="setter-tabs">
+    <div class="tab active" data-setter-tab="dashboard">Dashboard</div>
+    <div class="tab" data-setter-tab="log">Log Activity</div>
+    <div class="tab" data-setter-tab="activity">Activity Log</div>
+    <div class="tab" data-setter-tab="insights">Insights</div>
+</div>
+
+<!-- ═══════════════════ SETTER DASHBOARD ═══════════════════ -->
+<div class="setter-section active container" id="setter-section-dashboard">
+
+    <div class="filter-bar">
+        <div class="filter-pills">
+            <button class="pill active" data-setter-filter="all"   onclick="setSetterFilter('all')">All Time</button>
+            <button class="pill"        data-setter-filter="7days" onclick="setSetterFilter('7days')">Last 7 Days</button>
+            <button class="pill"        data-setter-filter="month" onclick="setSetterFilter('month')">This Month</button>
+        </div>
+        <div class="filter-month-wrap">
+            <input type="month" id="setter-month-picker" onchange="setSetterFilterMonth(this.value)" title="Pick a specific month">
+        </div>
+        <div class="filter-label" id="setter-filter-label"></div>
+    </div>
+
+    <div class="stats-grid" id="setter-stats-grid"></div>
+
+    <div class="card">
+        <div class="card-title">Activity Funnel</div>
+        <div class="funnel" id="setter-funnel"></div>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-card">
+            <div class="chart-title">Top Objections to Booking</div>
+            <div class="chart-wrap"><canvas id="setter-chart-objections"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">Sets per Day</div>
+            <div class="chart-wrap"><canvas id="setter-chart-sets"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ SETTER LOG ACTIVITY ═══════════════════ -->
+<div class="setter-section container" id="setter-section-log">
+    <div class="card">
+        <div class="card-title">Log Activity</div>
+        <form id="setter-form" onsubmit="submitSetterDay(event)">
+
+            <div class="form-grid">
+                <div class="field">
+                    <label>Date</label>
+                    <input type="date" id="s-date" required>
+                </div>
+                <div class="field">
+                    <label>Hours Worked</label>
+                    <input type="number" id="s-hours" min="0" max="24" step="0.5" placeholder="e.g. 4.5">
+                </div>
+            </div>
+
+            <hr class="divider">
+            <div class="section-label">Activity Numbers</div>
+
+            <div class="form-grid">
+                <div class="field">
+                    <label>Dials Made</label>
+                    <input type="number" id="s-dials" min="0" step="1" placeholder="0">
+                </div>
+                <div class="field">
+                    <label>DMs Sent</label>
+                    <input type="number" id="s-dms" min="0" step="1" placeholder="0">
+                </div>
+                <div class="field">
+                    <label>Connects (total conversations)</label>
+                    <input type="number" id="s-connects" min="0" step="1" placeholder="0">
+                </div>
+                <div class="field">
+                    <label>Qualified Leads</label>
+                    <input type="number" id="s-qualified" min="0" step="1" placeholder="0">
+                </div>
+                <div class="field">
+                    <label>Sets (meetings booked)</label>
+                    <input type="number" id="s-sets" min="0" step="1" placeholder="0">
+                </div>
+            </div>
+
+            <hr class="divider">
+            <div class="section-label">Objections to Booking</div>
+
+            <div class="field">
+                <label>Add objections you heard today</label>
+                <div class="obj-input-row">
+                    <select id="s-obj-select">
+                        <option value="">-- Select objection --</option>
+                        <option value="Not interested">Not interested</option>
+                        <option value="Already in a program">Already in a program</option>
+                        <option value="No time / Too busy">No time / Too busy</option>
+                        <option value="Need to think about it">Need to think about it</option>
+                        <option value="Not the right person">Not the right person</option>
+                        <option value="Price concern">Price concern</option>
+                        <option value="Bad timing">Bad timing</option>
+                        <option value="Hung up / Disconnected">Hung up / Disconnected</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <button type="button" class="btn btn-ghost" onclick="addSetterObj()">+ Add</button>
+                </div>
+                <div id="s-obj-chips" class="obj-chips"></div>
+            </div>
+
+            <div style="margin-top: 24px;">
+                <button type="submit" class="btn">Save Day</button>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════════════ SETTER ACTIVITY LOG ═══════════════════ -->
+<div class="setter-section container" id="setter-section-activity">
+    <div class="actions-bar">
+        <button class="btn btn-ghost" onclick="exportSetterCSV()">Export CSV</button>
+        <button class="btn btn-danger" onclick="clearAllSetterDays()">Clear All</button>
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+        <div class="tbl-wrap" id="setter-tbl-wrap"></div>
+    </div>
+</div>
+
+<!-- ═══════════════════ SETTER INSIGHTS ═══════════════════ -->
+<div class="setter-section container" id="setter-section-insights">
+    <div id="setter-insights-wrap"></div>
+</div>
+
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -849,9 +1059,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('f-date').valueAsDate = new Date();
     onPayTypeChange(); // init payment hint
 
-    document.querySelectorAll('.tab').forEach(t => {
+    document.querySelectorAll('.tab[data-tab]').forEach(t => {
         t.addEventListener('click', () => {
-            document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+            document.querySelectorAll('.tab[data-tab]').forEach(x => x.classList.remove('active'));
             document.querySelectorAll('.section').forEach(x => x.classList.remove('active'));
             t.classList.add('active');
             document.getElementById('section-' + t.dataset.tab).classList.add('active');
@@ -1417,6 +1627,438 @@ function exportCSV() {
 // ── Utils ─────────────────────────────────────────────────────────────────────
 
 function fmt(n) { return (n || 0).toLocaleString(); }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SETTER
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Setter State ──────────────────────────────────────────────────────────────
+
+let setterDays       = JSON.parse(localStorage.getItem('sc_setter_days') || '[]');
+let setterFilter     = 'all';
+let setterCustomMonth = null;
+let setterObjList    = [];
+let currentMode      = localStorage.getItem('sc_mode') || 'closer';
+let setterCharts     = {};
+
+// ── Mode Switching ────────────────────────────────────────────────────────────
+
+function setMode(mode) {
+    currentMode = mode;
+    localStorage.setItem('sc_mode', mode);
+    document.body.dataset.mode = mode;
+    document.getElementById('mode-btn-closer').classList.toggle('active', mode === 'closer');
+    document.getElementById('mode-btn-setter').classList.toggle('active', mode === 'setter');
+    document.querySelector('.header-title h1').textContent = mode === 'closer'
+        ? "The Closer's Performance Tracker"
+        : "The Setter's Performance Tracker";
+    if (mode === 'setter') renderSetterAll();
+    if (mode === 'closer') renderAll();
+}
+
+// ── Setter Boot ───────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.body.dataset.mode = currentMode;
+    const modeBtn = document.getElementById('mode-btn-' + currentMode);
+    if (modeBtn) modeBtn.classList.add('active');
+    if (currentMode === 'setter') {
+        document.querySelector('.header-title h1').textContent = "The Setter's Performance Tracker";
+    }
+
+    document.querySelectorAll('.tab[data-setter-tab]').forEach(t => {
+        t.addEventListener('click', () => {
+            document.querySelectorAll('.tab[data-setter-tab]').forEach(x => x.classList.remove('active'));
+            document.querySelectorAll('.setter-section').forEach(x => x.classList.remove('active'));
+            t.classList.add('active');
+            document.getElementById('setter-section-' + t.dataset.setterTab).classList.add('active');
+            renderSetterAll();
+        });
+    });
+
+    const sd = document.getElementById('s-date');
+    if (sd) sd.valueAsDate = new Date();
+
+    if (currentMode === 'setter') renderSetterAll();
+});
+
+// ── Objection Chips ───────────────────────────────────────────────────────────
+
+function addSetterObj() {
+    const sel = document.getElementById('s-obj-select');
+    const val = sel.value;
+    if (!val) return;
+    setterObjList.push(val);
+    renderSetterObjChips();
+    sel.value = '';
+}
+
+function removeSetterObj(idx) {
+    setterObjList.splice(idx, 1);
+    renderSetterObjChips();
+}
+
+function renderSetterObjChips() {
+    const el = document.getElementById('s-obj-chips');
+    if (!el) return;
+    el.innerHTML = setterObjList.map((obj, i) => `
+        <span class="obj-chip">${obj} <button type="button" onclick="removeSetterObj(${i})">×</button></span>
+    `).join('');
+}
+
+// ── Submit Day ────────────────────────────────────────────────────────────────
+
+function submitSetterDay(e) {
+    e.preventDefault();
+    const num = id => parseInt(document.getElementById(id).value) || 0;
+
+    setterDays.push({
+        id:         Date.now(),
+        date:       document.getElementById('s-date').value,
+        hours:      parseFloat(document.getElementById('s-hours').value) || 0,
+        dials:      num('s-dials'),
+        dms:        num('s-dms'),
+        connects:   num('s-connects'),
+        qualified:  num('s-qualified'),
+        sets:       num('s-sets'),
+        objections: [...setterObjList]
+    });
+
+    persistSetter();
+    resetSetterForm();
+    renderSetterAll();
+
+    document.querySelectorAll('.tab[data-setter-tab]').forEach((t, i) => t.classList.toggle('active', i === 0));
+    document.querySelectorAll('.setter-section').forEach((s, i) => s.classList.toggle('active', i === 0));
+}
+
+function resetSetterForm() {
+    document.getElementById('setter-form').reset();
+    const sd = document.getElementById('s-date');
+    if (sd) sd.valueAsDate = new Date();
+    setterObjList = [];
+    renderSetterObjChips();
+}
+
+// ── Persist / Delete ──────────────────────────────────────────────────────────
+
+function persistSetter() { localStorage.setItem('sc_setter_days', JSON.stringify(setterDays)); }
+
+function deleteSetterDay(id) {
+    if (!confirm('Delete this entry?')) return;
+    setterDays = setterDays.filter(d => d.id !== id);
+    persistSetter();
+    renderSetterAll();
+}
+
+function clearAllSetterDays() {
+    if (!confirm('Delete all setter data? This cannot be undone.')) return;
+    setterDays = [];
+    persistSetter();
+    renderSetterAll();
+}
+
+// ── Filter ────────────────────────────────────────────────────────────────────
+
+function getFilteredSetterDays() {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    if (setterFilter === '7days') {
+        const cutoff = new Date(today);
+        cutoff.setDate(cutoff.getDate() - 6);
+        cutoff.setHours(0, 0, 0, 0);
+        return setterDays.filter(d => new Date(d.date) >= cutoff);
+    }
+    if (setterFilter === 'month') {
+        const y = today.getFullYear(), m = today.getMonth();
+        return setterDays.filter(d => {
+            const dt = new Date(d.date);
+            return dt.getFullYear() === y && dt.getMonth() === m;
+        });
+    }
+    if (setterFilter === 'custom' && setterCustomMonth) {
+        const [y, m] = setterCustomMonth.split('-').map(Number);
+        return setterDays.filter(d => {
+            const dt = new Date(d.date);
+            return dt.getFullYear() === y && dt.getMonth() === m - 1;
+        });
+    }
+    return setterDays;
+}
+
+function setSetterFilter(f) {
+    setterFilter = f;
+    setterCustomMonth = null;
+    document.getElementById('setter-month-picker').value = '';
+    document.querySelectorAll('[data-setter-filter]').forEach(p => p.classList.toggle('active', p.dataset.setterFilter === f));
+    renderSetterDashboard();
+}
+
+function setSetterFilterMonth(val) {
+    if (!val) return;
+    setterFilter = 'custom';
+    setterCustomMonth = val;
+    document.querySelectorAll('[data-setter-filter]').forEach(p => p.classList.remove('active'));
+    renderSetterDashboard();
+}
+
+function setterFilterLabel(filtered) {
+    const n = filtered.length;
+    const day = n === 1 ? 'day' : 'days';
+    if (setterFilter === 'all')   return `All time &mdash; ${n} ${day} logged`;
+    if (setterFilter === '7days') return `Last 7 days &mdash; ${n} ${day} logged`;
+    if (setterFilter === 'month') {
+        const now = new Date();
+        return `${now.toLocaleString('default',{month:'long'})} ${now.getFullYear()} &mdash; ${n} ${day} logged`;
+    }
+    if (setterFilter === 'custom' && setterCustomMonth) {
+        const [y, m] = setterCustomMonth.split('-').map(Number);
+        const label = new Date(y, m - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+        return `${label} &mdash; ${n} ${day} logged`;
+    }
+    return '';
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+function setterStats(src) {
+    const d   = src || getFilteredSetterDays();
+    const sum = key => d.reduce((s, x) => s + (x[key] || 0), 0);
+    const pct = (a, b) => b === 0 ? 0 : Math.round(a / b * 100);
+
+    const dials     = sum('dials');
+    const dms       = sum('dms');
+    const connects  = sum('connects');
+    const qualified = sum('qualified');
+    const sets      = sum('sets');
+    const hours     = sum('hours');
+    const days      = d.length;
+
+    return {
+        days, dials, dms, connects, qualified, sets, hours,
+        qualifyRate:  pct(qualified, connects),
+        qualToSet:    pct(sets, qualified),
+        connectToSet: pct(sets, connects),
+        hoursPerSet:  sets > 0 ? +(hours / sets).toFixed(1) : 0,
+        setsPerDay:   days > 0 ? +(sets  / days).toFixed(1) : 0,
+    };
+}
+
+// ── Render All ────────────────────────────────────────────────────────────────
+
+function renderSetterAll() {
+    renderSetterDashboard();
+    renderSetterLog();
+    renderSetterInsights();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+
+function renderSetterDashboard() {
+    const filtered = getFilteredSetterDays();
+    const s = setterStats(filtered);
+    document.getElementById('setter-filter-label').innerHTML = setterFilterLabel(filtered);
+
+    document.getElementById('setter-stats-grid').innerHTML = [
+        { val: s.connects,               label: 'Total Connects',  cls: '' },
+        { val: s.sets,                   label: 'Total Sets',      cls: 'green' },
+        { val: s.qualifyRate + '%',      label: '% Qualified',     cls: '' },
+        { val: s.qualToSet + '%',        label: 'Qual → Set',      cls: '' },
+        { val: s.connectToSet + '%',     label: 'Connect → Set',   cls: '' },
+        { val: s.hours.toFixed(1) + 'h', label: 'Hours Worked',    cls: '' }
+    ].map(x => `
+        <div class="stat ${x.cls}">
+            <div class="stat-value">${x.val}</div>
+            <div class="stat-label">${x.label}</div>
+        </div>
+    `).join('');
+
+    const fc = ['#c9a84c','#38bdf8','#fbbf24','#4ade80'];
+    const fSteps = [
+        { label: 'Dials',     n: s.dials,     color: fc[0], pct: 100 },
+        { label: 'Connects',  n: s.connects,  color: fc[1], pct: s.dials > 0 ? Math.round(s.connects  / s.dials * 100) : 0 },
+        { label: 'Qualified', n: s.qualified, color: fc[2], pct: s.dials > 0 ? Math.round(s.qualified / s.dials * 100) : 0 },
+        { label: 'Sets',      n: s.sets,      color: fc[3], pct: s.dials > 0 ? Math.round(s.sets      / s.dials * 100) : 0 }
+    ];
+
+    document.getElementById('setter-funnel').innerHTML = fSteps.map(step => `
+        <div class="funnel-step">
+            <div class="funnel-label">${step.label}</div>
+            <div class="funnel-track">
+                <div class="funnel-fill" style="width:${Math.max(step.pct, 4)}%; background:${step.color}22; border-left: 3px solid ${step.color}; color:${step.color};">
+                    ${step.n}
+                </div>
+            </div>
+            <div class="funnel-pct">${step.pct}%</div>
+        </div>
+    `).join('');
+
+    renderSetterCharts(filtered);
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+
+function killSetterChart(id) {
+    if (setterCharts[id]) { setterCharts[id].destroy(); delete setterCharts[id]; }
+}
+
+function renderSetterCharts(filtered) {
+    const days = filtered || getFilteredSetterDays();
+
+    killSetterChart('objections');
+    const objCounts = {};
+    days.forEach(d => (d.objections || []).forEach(o => { objCounts[o] = (objCounts[o] || 0) + 1; }));
+    if (Object.keys(objCounts).length) {
+        const sorted = Object.entries(objCounts).sort((a,b) => b[1]-a[1]);
+        setterCharts.objections = new Chart(document.getElementById('setter-chart-objections'), {
+            type: 'bar',
+            data: { labels: sorted.map(x => x[0]), datasets: [{ data: sorted.map(x => x[1]), backgroundColor: '#c9a84c33', borderColor: '#c9a84c', borderWidth: 1, borderRadius: 4 }] },
+            options: hBarOpts()
+        });
+    }
+
+    killSetterChart('sets');
+    const sorted = [...days].sort((a,b) => a.date.localeCompare(b.date));
+    if (sorted.length) {
+        setterCharts.sets = new Chart(document.getElementById('setter-chart-sets'), {
+            type: 'bar',
+            data: {
+                labels: sorted.map(d => d.date),
+                datasets: [{ data: sorted.map(d => d.sets), backgroundColor: '#4ade8033', borderColor: '#4ade80', borderWidth: 1, borderRadius: 4 }]
+            },
+            options: vBarOpts()
+        });
+    }
+}
+
+// ── Activity Log Table ────────────────────────────────────────────────────────
+
+function renderSetterLog() {
+    const el = document.getElementById('setter-tbl-wrap');
+    if (!el) return;
+
+    if (setterDays.length === 0) {
+        el.innerHTML = `<div class="empty"><h3>No activity logged yet</h3><p>Log your first day to start tracking.</p></div>`;
+        return;
+    }
+
+    const sortedDays = [...setterDays].sort((a,b) => b.date.localeCompare(a.date));
+    const p = (a, b) => b ? Math.round(a/b*100) + '%' : '—';
+
+    el.innerHTML = `
+        <table>
+            <thead><tr>
+                <th>Date</th>
+                <th>Dials</th><th>DMs</th><th>Connects</th>
+                <th>Qualified</th><th>Sets</th><th>Hours</th>
+                <th>% Qual</th><th>Qual→Set</th><th>Connect→Set</th>
+                <th>Objections</th>
+                <th></th>
+            </tr></thead>
+            <tbody>
+                ${sortedDays.map(d => `
+                    <tr>
+                        <td>${d.date}</td>
+                        <td>${d.dials}</td>
+                        <td>${d.dms}</td>
+                        <td>${d.connects}</td>
+                        <td>${d.qualified}</td>
+                        <td style="color:var(--green); font-weight:700;">${d.sets}</td>
+                        <td>${d.hours || '—'}</td>
+                        <td>${p(d.qualified, d.connects)}</td>
+                        <td>${p(d.sets, d.qualified)}</td>
+                        <td>${p(d.sets, d.connects)}</td>
+                        <td style="color:var(--text-muted); font-size:11px;">${(d.objections || []).join(', ') || '—'}</td>
+                        <td><button class="del-btn" onclick="deleteSetterDay(${d.id})">×</button></td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+// ── Insights ──────────────────────────────────────────────────────────────────
+
+function renderSetterInsights() {
+    const el = document.getElementById('setter-insights-wrap');
+    if (!el) return;
+
+    if (setterDays.length < 2) {
+        el.innerHTML = `<div class="card"><div class="empty"><h3>Not enough data yet</h3><p>Log at least 2 days to start seeing insights.</p></div></div>`;
+        return;
+    }
+
+    const s = setterStats();
+    const notes = [];
+
+    if (s.connects >= 5) {
+        if (s.connectToSet < 10)
+            notes.push({ cls: 'danger', text: `Connect-to-set rate is <strong>${s.connectToSet}%</strong>. Under 10% means most conversations aren't converting to meetings. Either your qualifying is weak or you're not pitching the meeting hard enough.` });
+        else if (s.connectToSet >= 20)
+            notes.push({ cls: 'good', text: `Connect-to-set rate is <strong>${s.connectToSet}%</strong>. Strong. 1 in 5 conversations turning into meetings is above average.` });
+        else
+            notes.push({ cls: 'warn', text: `Connect-to-set rate is <strong>${s.connectToSet}%</strong>. Room to improve — work on creating urgency and selling the meeting harder.` });
+    }
+
+    if (s.qualified >= 3) {
+        if (s.qualToSet < 30)
+            notes.push({ cls: 'danger', text: `Only <strong>${s.qualToSet}%</strong> of qualified leads are booking. You're finding the right people but not converting them. Pre-handle the most common objections before they come up.` });
+        else if (s.qualToSet >= 60)
+            notes.push({ cls: 'good', text: `<strong>${s.qualToSet}%</strong> of qualified leads are booking. When you find the right person, you're closing them on the meeting.` });
+        else
+            notes.push({ cls: 'warn', text: `<strong>${s.qualToSet}%</strong> of qualified leads are setting. To push this higher, lead with a stronger reason for the call and create more urgency.` });
+    }
+
+    const objMap = {};
+    setterDays.forEach(d => (d.objections || []).forEach(o => { objMap[o] = (objMap[o] || 0) + 1; }));
+    const topObj = Object.entries(objMap).sort((a,b) => b[1]-a[1])[0];
+    if (topObj)
+        notes.push({ cls: '', text: `Most common objection: <strong>"${topObj[0]}"</strong> (${topObj[1]} times). If you're getting this repeatedly, address it proactively before it comes up.` });
+
+    if (s.dials === 0 && s.dms > 0)
+        notes.push({ cls: 'warn', text: `No dials logged — you're only tracking DMs. If you have a phone number, calling almost always converts better.` });
+
+    if (s.sets > 0 && s.hours > 0)
+        notes.push({ cls: '', text: `You're averaging <strong>${s.hoursPerSet}h per set</strong>. Track this over time — as your skill improves, hours per set should drop.` });
+
+    el.innerHTML = `
+        <div class="card">
+            <div class="card-title">Setter Summary</div>
+            <div class="rev-row"><span class="rev-label">Total Dials</span>                   <span class="rev-val">${s.dials}</span></div>
+            <div class="rev-row"><span class="rev-label">Total DMs Sent</span>                <span class="rev-val">${s.dms}</span></div>
+            <div class="rev-row"><span class="rev-label">Total Connects</span>                <span class="rev-val">${s.connects}</span></div>
+            <div class="rev-row"><span class="rev-label">Total Sets</span>                    <span class="rev-val green">${s.sets}</span></div>
+            <div class="rev-row"><span class="rev-label">% Qualified (of Connects)</span>    <span class="rev-val">${s.qualifyRate}%</span></div>
+            <div class="rev-row"><span class="rev-label">Qualified → Set Rate</span>         <span class="rev-val">${s.qualToSet}%</span></div>
+            <div class="rev-row"><span class="rev-label">Connect → Set Rate</span>           <span class="rev-val">${s.connectToSet}%</span></div>
+            <div class="rev-row"><span class="rev-label">Avg Sets / Day</span>               <span class="rev-val">${s.setsPerDay}</span></div>
+            <div class="rev-row"><span class="rev-label">Total Hours Worked</span>           <span class="rev-val">${s.hours.toFixed(1)}h</span></div>
+        </div>
+        <div class="card">
+            <div class="card-title">What the Data Is Telling You</div>
+            ${notes.length ? notes.map(n => `<div class="insight ${n.cls}">${n.text}</div>`).join('') : '<div class="insight">Keep logging — insights will appear as patterns emerge.</div>'}
+        </div>
+    `;
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+
+function exportSetterCSV() {
+    if (!setterDays.length) { alert('Nothing to export yet.'); return; }
+    const p = (a,b) => b ? Math.round(a/b*100) + '%' : '0%';
+    const headers = ['Date','Hours','Dials','DMs','Connects','Qualified','Sets','Qual%','Q→Set%','C→Set%','Objections'];
+    const rows = setterDays.map(d => [
+        d.date, d.hours, d.dials, d.dms, d.connects, d.qualified, d.sets,
+        p(d.qualified, d.connects), p(d.sets, d.qualified), p(d.sets, d.connects),
+        (d.objections || []).join('; ')
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = 'setter-tracker-' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+}
 </script>
 
 </body>
