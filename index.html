@@ -215,11 +215,16 @@
         .pill:hover { border-color: var(--gold); color: var(--text); }
         .pill.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); }
 
-        .filter-month-wrap input[type="month"] {
+        .filter-date-range {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .filter-date-range input[type="date"] {
             background: var(--surface2);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 7px 12px;
+            padding: 7px 10px;
             color: var(--text);
             font-size: 12px;
             font-weight: 600;
@@ -227,9 +232,10 @@
             cursor: pointer;
             transition: border-color 0.15s;
         }
-
-        .filter-month-wrap input[type="month"]:focus,
-        .filter-month-wrap input[type="month"]:hover { border-color: var(--gold); }
+        .filter-date-range input[type="date"]:focus,
+        .filter-date-range input[type="date"]:hover { border-color: var(--gold); }
+        .filter-date-range input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
+        .date-sep { color: var(--text-muted); font-size: 12px; font-weight: 600; }
 
         .filter-label {
             margin-left: auto;
@@ -713,8 +719,10 @@
             <button class="pill"        data-filter="7days"   onclick="setFilter('7days')">Last 7 Days</button>
             <button class="pill"        data-filter="month"   onclick="setFilter('month')">This Month</button>
         </div>
-        <div class="filter-month-wrap">
-            <input type="month" id="month-picker" onchange="setFilterMonth(this.value)" title="Pick a specific month">
+        <div class="filter-date-range">
+            <input type="date" id="date-from" onchange="setFilterDateRange('from', this.value)" title="Start date">
+            <span class="date-sep">→</span>
+            <input type="date" id="date-to" onchange="setFilterDateRange('to', this.value)" title="End date">
         </div>
         <div class="filter-label" id="filter-label"></div>
     </div>
@@ -929,8 +937,10 @@
             <button class="pill"        data-setter-filter="7days" onclick="setSetterFilter('7days')">Last 7 Days</button>
             <button class="pill"        data-setter-filter="month" onclick="setSetterFilter('month')">This Month</button>
         </div>
-        <div class="filter-month-wrap">
-            <input type="month" id="setter-month-picker" onchange="setSetterFilterMonth(this.value)" title="Pick a specific month">
+        <div class="filter-date-range">
+            <input type="date" id="setter-date-from" onchange="setSetterFilterDateRange('from', this.value)" title="Start date">
+            <span class="date-sep">→</span>
+            <input type="date" id="setter-date-to" onchange="setSetterFilterDateRange('to', this.value)" title="End date">
         </div>
         <div class="filter-label" id="setter-filter-label"></div>
     </div>
@@ -984,7 +994,7 @@
                     <input type="number" id="s-dms" min="0" step="1" placeholder="0">
                 </div>
                 <div class="field">
-                    <label>Connects (total conversations)</label>
+                    <label>Connects (dials or DMs)</label>
                     <input type="number" id="s-connects" min="0" step="1" placeholder="0">
                 </div>
                 <div class="field">
@@ -1051,7 +1061,8 @@ let calls = JSON.parse(localStorage.getItem('sc_calls') || '[]');
 let tog = { showed: null, qualified: null, pitched: null, paid: null };
 let chartInstances = {};
 let activeFilter = 'all';   // 'all' | '7days' | 'month' | 'custom'
-let customMonth  = null;    // 'YYYY-MM' string when filter is 'custom'
+let customFrom = null;   // 'YYYY-MM-DD' start of custom range
+let customTo   = null;   // 'YYYY-MM-DD' end of custom range
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
@@ -1250,12 +1261,10 @@ function getFilteredCalls() {
         });
     }
 
-    if (activeFilter === 'custom' && customMonth) {
-        const [y, m] = customMonth.split('-').map(Number);
-        return calls.filter(c => {
-            const d = new Date(c.date);
-            return d.getFullYear() === y && d.getMonth() === m - 1;
-        });
+    if (activeFilter === 'custom') {
+        const from = customFrom || customTo;
+        const to   = customTo   || customFrom;
+        return calls.filter(c => c.date >= from && c.date <= to);
     }
 
     return calls; // 'all'
@@ -1263,16 +1272,20 @@ function getFilteredCalls() {
 
 function setFilter(f) {
     activeFilter = f;
-    customMonth  = null;
-    document.getElementById('month-picker').value = '';
+    customFrom = null;
+    customTo   = null;
+    document.getElementById('date-from').value = '';
+    document.getElementById('date-to').value   = '';
     document.querySelectorAll('.pill').forEach(p => p.classList.toggle('active', p.dataset.filter === f));
     renderDashboard();
 }
 
-function setFilterMonth(val) {
+function setFilterDateRange(field, val) {
     if (!val) return;
+    if (field === 'from') customFrom = val;
+    if (field === 'to')   customTo   = val;
+    if (!customFrom && !customTo) return;
     activeFilter = 'custom';
-    customMonth  = val;
     document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
     renderDashboard();
 }
@@ -1285,9 +1298,10 @@ function filterLabel(filtered) {
         const now = new Date();
         return `${now.toLocaleString('default',{month:'long'})} ${now.getFullYear()} &mdash; ${n} call${n !== 1 ? 's' : ''}`;
     }
-    if (activeFilter === 'custom' && customMonth) {
-        const [y, m] = customMonth.split('-').map(Number);
-        const label = new Date(y, m - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+    if (activeFilter === 'custom' && (customFrom || customTo)) {
+        const from  = customFrom || customTo;
+        const to    = customTo   || customFrom;
+        const label = from === to ? from : `${from} &ndash; ${to}`;
         return `${label} &mdash; ${n} call${n !== 1 ? 's' : ''}`;
     }
     return '';
@@ -1636,7 +1650,8 @@ function fmt(n) { return (n || 0).toLocaleString(); }
 
 let setterDays       = JSON.parse(localStorage.getItem('sc_setter_days') || '[]');
 let setterFilter     = 'all';
-let setterCustomMonth = null;
+let setterFrom = null;  // 'YYYY-MM-DD'
+let setterTo   = null;  // 'YYYY-MM-DD'
 let setterObjList    = [];
 let currentMode      = localStorage.getItem('sc_mode') || 'closer';
 let setterCharts     = {};
@@ -1777,28 +1792,30 @@ function getFilteredSetterDays() {
             return dt.getFullYear() === y && dt.getMonth() === m;
         });
     }
-    if (setterFilter === 'custom' && setterCustomMonth) {
-        const [y, m] = setterCustomMonth.split('-').map(Number);
-        return setterDays.filter(d => {
-            const dt = new Date(d.date);
-            return dt.getFullYear() === y && dt.getMonth() === m - 1;
-        });
+    if (setterFilter === 'custom') {
+        const from = setterFrom || setterTo;
+        const to   = setterTo   || setterFrom;
+        return setterDays.filter(d => d.date >= from && d.date <= to);
     }
     return setterDays;
 }
 
 function setSetterFilter(f) {
     setterFilter = f;
-    setterCustomMonth = null;
-    document.getElementById('setter-month-picker').value = '';
+    setterFrom = null;
+    setterTo   = null;
+    document.getElementById('setter-date-from').value = '';
+    document.getElementById('setter-date-to').value   = '';
     document.querySelectorAll('[data-setter-filter]').forEach(p => p.classList.toggle('active', p.dataset.setterFilter === f));
     renderSetterDashboard();
 }
 
-function setSetterFilterMonth(val) {
+function setSetterFilterDateRange(field, val) {
     if (!val) return;
+    if (field === 'from') setterFrom = val;
+    if (field === 'to')   setterTo   = val;
+    if (!setterFrom && !setterTo) return;
     setterFilter = 'custom';
-    setterCustomMonth = val;
     document.querySelectorAll('[data-setter-filter]').forEach(p => p.classList.remove('active'));
     renderSetterDashboard();
 }
@@ -1812,9 +1829,10 @@ function setterFilterLabel(filtered) {
         const now = new Date();
         return `${now.toLocaleString('default',{month:'long'})} ${now.getFullYear()} &mdash; ${n} ${day} logged`;
     }
-    if (setterFilter === 'custom' && setterCustomMonth) {
-        const [y, m] = setterCustomMonth.split('-').map(Number);
-        const label = new Date(y, m - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+    if (setterFilter === 'custom' && (setterFrom || setterTo)) {
+        const from  = setterFrom || setterTo;
+        const to    = setterTo   || setterFrom;
+        const label = from === to ? from : `${from} &ndash; ${to}`;
         return `${label} &mdash; ${n} ${day} logged`;
     }
     return '';
